@@ -17,15 +17,14 @@ def report(**kw):
 def test_slack_layout():
     text = to_slack(report())
     assert text.splitlines() == [
-        "*Daily report: Thu 08/10*",
+        "*📋 Daily report · Thu 08/10*",
         "",
         "*Storefront*",
-        "Yesterday I worked on:",
         "• <https://acme.atlassian.net/browse/APP-9588|APP-9588>: History page loads indefinitely",
         "    ✅ Done: Fix ready (Jira: In Review)",
         "",
+        "───────────────",
         "*jukebox*",
-        "Yesterday I worked on:",
         "• Stake picker polish",
         "    🟡 In progress: PR opened",
         "• Waiting on design",
@@ -51,7 +50,7 @@ def test_slack_warning_and_fallback_items():
 
 
 def test_slack_empty_report():
-    assert to_slack(Report(DAY, [])) == "*Daily report: Thu 08/10*\n\nNo agent activity recorded for 2026-10-08."
+    assert to_slack(Report(DAY, [])) == "*📋 Daily report · Thu 08/10*\n\nNo agent activity recorded for 2026-10-08."
 
 
 def test_slack_truncates_long_reports():
@@ -62,9 +61,73 @@ def test_slack_truncates_long_reports():
 
 
 def test_markdown():
-    md = to_markdown(report())
-    assert md.startswith("# Daily report: Thu 08/10\n")
-    assert "## Storefront" in md
-    assert "- [APP-9588](https://acme.atlassian.net/browse/APP-9588): History page loads indefinitely" in md
-    assert "  - ✅ Done: Fix ready (Jira: In Review)" in md
-    assert "- Stake picker polish" in md
+    assert to_markdown(report()) == (
+        "# 📋 Daily report · Thu 08/10\n\n"
+        "## Storefront\n\n"
+        "- [APP-9588](https://acme.atlassian.net/browse/APP-9588): History page loads indefinitely\n"
+        "  - ✅ Done: Fix ready (Jira: In Review)\n\n"
+        "## jukebox\n\n"
+        "- Stake picker polish\n"
+        "  - 🟡 In progress: PR opened\n"
+        "- Waiting on design\n"
+        "  - 🔴 Blocked: Needs Alex's mockup\n"
+    )
+
+
+def test_status_order_and_fallback_items():
+    r = Report(DAY, [ProjectReport("Mixed", [
+        ReportItem(None, "Blocked task", "blocked", ""),
+        ReportItem("KEY-1", "", None, ""),
+        ReportItem(None, "Working", "in_progress", ""),
+        ReportItem(None, "Unknown status", "unknown", "note", "Open"),
+        ReportItem("KEY-2", "Finished", "done", ""),
+        ReportItem(None, "Also finished", "done", ""),
+    ])])
+    assert to_slack(r).splitlines()[3:] == [
+        "• KEY-1",
+        "• Unknown status",
+        "    note (Jira: Open)",
+        "• KEY-2: Finished",
+        "    ✅ Done",
+        "• Also finished",
+        "    ✅ Done",
+        "• Working",
+        "    🟡 In progress",
+        "• Blocked task",
+        "    🔴 Blocked",
+    ]
+    assert to_markdown(r).splitlines()[4:] == [
+        "- KEY-1",
+        "- Unknown status",
+        "  - note (Jira: Open)",
+        "- KEY-2: Finished",
+        "  - ✅ Done",
+        "- Also finished",
+        "  - ✅ Done",
+        "- Working",
+        "  - 🟡 In progress",
+        "- Blocked task",
+        "  - 🔴 Blocked",
+    ]
+
+
+def test_statusless_details_without_notes():
+    r = Report(DAY, [ProjectReport("Fallback", [
+        ReportItem(None, "Title only", None, ""),
+        ReportItem("KEY-1", "", None, "note"),
+        ReportItem("KEY-2", "", None, "", "Open"),
+    ])])
+    assert to_slack(r).splitlines()[3:] == [
+        "• Title only", "• KEY-1", "    note", "• KEY-2", "    (Jira: Open)",
+    ]
+    assert to_markdown(r).splitlines()[4:] == [
+        "- Title only", "- KEY-1", "  - note", "- KEY-2", "  - (Jira: Open)",
+    ]
+
+
+def test_markdown_warning_and_empty_report():
+    assert to_markdown(Report(DAY, [], warning="AI unavailable")) == (
+        "# 📋 Daily report · Thu 08/10\n\n"
+        "> ⚠️ AI unavailable\n\n"
+        "No agent activity recorded for 2026-10-08.\n"
+    )

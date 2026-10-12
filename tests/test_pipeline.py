@@ -49,7 +49,7 @@ def test_send_posts_archives_and_marks(tmp_path):
                            post=lambda url, text: posted.append((url, text)), resolve=lambda ref: "https://hooks.slack.com/x")
     assert status == "sent"
     assert posted[0][0] == "https://hooks.slack.com/x"
-    assert "Daily report: Fri 09/10" in posted[0][1]
+    assert "📋 Daily report · Fri 09/10" in posted[0][1]
     assert (tmp_path / "reports" / "2026-10-09.md").exists()
     assert (tmp_path / "sent" / "2026-10-09").exists()
 

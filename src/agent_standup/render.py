@@ -8,7 +8,7 @@ def _esc(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _detail(item: ReportItem) -> str | None:
+def _detail(item: ReportItem) -> str:
     parts = []
     if item.status in LABELS:
         parts.append(LABELS[item.status] + (f": {item.note}" if item.note else ""))
@@ -16,11 +16,16 @@ def _detail(item: ReportItem) -> str | None:
         parts.append(item.note)
     if item.jira_status:
         parts.append(f"(Jira: {item.jira_status})")
-    return " ".join(parts) or None
+    return " ".join(parts)
+
+
+def _ordered(items: list[ReportItem]) -> list[ReportItem]:
+    order = {status: index for index, status in enumerate(LABELS, 1)}
+    return sorted(items, key=lambda item: order.get(item.status, 0))
 
 
 def _header(report: Report) -> str:
-    return f"Daily report: {report.day:%a %d/%m}"
+    return f"📋 Daily report · {report.day:%a %d/%m}"
 
 
 def to_slack(report: Report, limit: int = 39000) -> str:
@@ -29,10 +34,15 @@ def to_slack(report: Report, limit: int = 39000) -> str:
         lines.append(f"_⚠️ {_esc(report.warning)}_")
     if not report.projects:
         lines += ["", f"No agent activity recorded for {report.day.isoformat()}."]
-    for project in report.projects:
-        lines += ["", f"*{_esc(project.name)}*", "Yesterday I worked on:"]
-        for item in project.items:
-            key = f"<{item.url}|{item.key}>" if item.key and item.url else (item.key or "")
+    for index, project in enumerate(report.projects):
+        lines.append("")
+        if index:
+            lines.append("───────────────")
+        lines.append(f"*{_esc(project.name)}*")
+        for item in _ordered(project.items):
+            key = _esc(item.key or "")
+            if key and item.url:
+                key = f"<{_esc(item.url)}|{key}>"
             title = _esc(item.title)
             lines.append("• " + (f"{key}: {title}" if key and title else key or title))
             detail = _detail(item)
@@ -53,7 +63,7 @@ def to_markdown(report: Report) -> str:
         lines.append(f"No agent activity recorded for {report.day.isoformat()}.")
     for project in report.projects:
         lines += [f"## {project.name}", ""]
-        for item in project.items:
+        for item in _ordered(project.items):
             key = f"[{item.key}]({item.url})" if item.key and item.url else (item.key or "")
             lines.append("- " + (f"{key}: {item.title}" if key and item.title else key or item.title))
             detail = _detail(item)
