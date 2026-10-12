@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-standup"
+version = "0.1.0"
+description = "Daily standup reports from your Claude Code and Codex CLI sessions, posted to Slack."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+agent-standup = "agent_standup.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_standup"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
